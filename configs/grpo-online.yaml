@@ -1,0 +1,25 @@
+type: grpo-online
+model: null
+datasets:
+  - pkuAI4M/minif2f-lean4-normalized
+  - datasets/proofnet.jsonl
+log_dir: ./logs
+trans_prompt: "Translate the statement of this math problem into a single theorem in formal language Lean4 with natural language reasoning."
+beta_1: 0.0
+beta_2: 0.0
+beta_3: 4.0
+grpo_configs:
+  learning_rate: !!float 4e-6
+  logging_steps: 10
+  gradient_accumulation_steps: 1
+  max_completion_length: 1024
+  per_device_train_batch_size: 4
+  bf16: true
+  num_generations: 4
+  save_steps: 160
+  num_train_epochs: 3.0
+  beta: 0.0
+sp_params:
+  temperature: 0.9
+  min_p: 0.05
+  max_tokens: 1024

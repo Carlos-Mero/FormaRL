@@ -1,0 +1,17 @@
+type: sft-baseline
+model: Qwen/Qwen2.5-7B-Instruct
+datasets:
+  - internlm/Lean-Workbook
+trans_prompt: Translate this math problem into formal language Lean 4.
+log_dir: ./logs
+sft_params:
+  max_seq_length: 2048
+  per_device_train_batch_size: 1
+  save_steps: 1600
+  fp16: true
+  num_train_epochs: 3
+  #  use_liger: true
+  neftune_noise_alpha: 5
+  model_init_kwargs:
+    trust_remote_code: true
+    torch_dtype: bfloat16

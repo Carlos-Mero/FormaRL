@@ -1,0 +1,13 @@
+type: infer
+model: null
+datasets:
+  - pkuAI4M/minif2f-lean4-normalized
+  - datasets/proofnet.jsonl
+trans_prompt: "Translate the statement of this math problem into a single theorem in formal language Lean4 with natural language reasoning. Do not write any proof steps for this theorem, you can simply use `sorry` as a place holder of the detailed proof. For example, 1+1=2 is translated into ```lean\nexample: 1+1=2 := sorry\n```."
+model_init_params:
+  trust_remote_code: true
+sampling_params:
+  temperature: 0.9
+  min_p: 0.05
+  max_tokens: 2048
+save_path: null
