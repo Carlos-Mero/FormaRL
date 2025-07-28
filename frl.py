@@ -5,7 +5,7 @@ import os
 
 from training_scripts.sft import sft_full
 from training_scripts.grpo import grpo_online
-from inference import translate_full, translate_baseline, translate_rtpipeline
+from inference import translate_rtpipeline
 
 from utils import set_all_seeds
 
@@ -33,7 +33,7 @@ def main():
     parser.add_argument('-s', '--seed', type=int, default=1121, help="The global random seed in this program.")
     parser.add_argument('-n', '--n_samples', type=int, default=-1, help="The samples per prompt used in generating samples for GRPO")
     parser.add_argument('--eval_model', type=str, default="Qwen/Qwen2.5-7B-Instruct-GPTQ-Int8", help="The model used in consistency check")
-    parser.add_argument('-ds', '--deepseek', action='store_true', default=False, help="Use DeepSeek-V3 as the evaluation model")
+    parser.add_argument('-r', '--remote', action='store_true', default=False, help="Use remote API call in consistency check")
     parser.add_argument('--grpo_beta', type=float, default=-1.0, help="The hyperparameter of the grpo trainer, used to introduce KL divergence term into the loss function")
     parser.add_argument('--beta_1', type=float, default=-1.0, help="The hyperparameter of the evaluator in grpo")
     parser.add_argument('--beta_2', type=float, default=-1.0, help="The hyperparameter of the evaluator in grpo")
@@ -51,7 +51,7 @@ def main():
             # overwrite original configs by command line arguments
             config['test'] = args.test
             config['seed'] = args.seed
-            config['deepseek'] = args.deepseek
+            config['remote'] = args.remote
             config['eval_model'] = args.eval_model
             set_all_seeds(args.seed)
             if args.model:

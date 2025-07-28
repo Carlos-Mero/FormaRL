@@ -3,13 +3,12 @@ import json
 import torch
 from multiprocessing import Manager
 from vllm import LLM, SamplingParams
-from transformers import pipeline
+from transformers import AutoModelForCausalLM, AutoTokenizer, pipeline
 from tools import DataLoader,CompilerChecker,header
 from tools.verifier import Lean4ServerScheduler
 from tools.utils import load_config
 from more_itertools import chunked
 from accelerate import Accelerator
-from gptqmodel import GPTQModel
 from statistics import mean, stdev
 import logging
 import openai
@@ -154,7 +153,6 @@ class Evaluator():
         self.logger = logging.getLogger(__name__)
         self.hd = header()
         self.accelerator = Accelerator()
-        self.eval_device = f"cuda:{int(self.accelerator.num_processes) + 1}" # Set the vllm device to accelerator device + 1
         self.cfg = load_config('configs/eval_cfg.py')
         self.verifier = Lean4ServerScheduler(
             max_concurrent_requests=8,
@@ -164,14 +162,12 @@ class Evaluator():
         )
         available_gpus = os.environ["CUDA_VISIBLE_DEVICES"].split(",")
         self.batch_size = len(available_gpus)
-        self.use_back_trans = config['use_back_trans']
-        self.exclude_header = config['exclude_header']
         self.beta_1 = beta_1
         self.beta_2 = beta_2
         self.beta_3 = beta_3
 
         # load GPTQ model as evaluation model
-        if config['deepseek']:
+        if config['remote']:
             load_dotenv()
             api_key = os.getenv("OPENAI_API_KEY")
             base_url = os.getenv("OPENAI_BASE_URL", "https://api.openai.com/v1")
@@ -193,8 +189,9 @@ class Evaluator():
                 return results
             self.eval_pipe = eval_pipe
         else:
-            model = GPTQModel.load(config['eval_model'])
-            self.eval_pipe = pipeline(task="text-generation", model=model, tokenizer=model.tokenizer, device_map=self.accelerator.device)
+            model = AutoModelForCausalLM.from_pretrained(config['eval_model'], torch_dtype=torch.bfloat16).to(self.accelerator.device)
+            tokenizer = AutoTokenizer.from_pretrained(config['eval_model'])
+            self.eval_pipe = pipeline(task="text-generation", model=model, tokenizer=tokenizer, device_map=self.accelerator.device)
 
     def compiler_check(self, translations, flps):
         manager = Manager()
@@ -236,14 +233,14 @@ class Evaluator():
                 consistency_results += [1.0 if flps[i] != '' and "1+1=2" not in flps[i] and find_boxed(output[0]['generated_text']) == 'true' else 0.0 for (i, output) in enumerate(outputs)]
         return consistency_results
 
-    def __call__(self, prompts, completions):
+    def __call__(self, prompts, completions, completion_ids, **reward_kwargs):
         # create nl-fl pairs for reward checks
         nlps = [prompt.split("\n\n", 1)[1] if isinstance(prompt, str) else prompt[0]['content'].split("\n\n", 1)[1] for prompt in prompts] # split between the inference prompt and problem to extract the problem
-        flps = [extract_code_block(completion) if isinstance(completion, str) else extract_code_block(completion[0]['content']) for completion in completions]
-        flps = [remove_lean_comments(completion) if flp == '' else remove_lean_comments(flp) for (completion, flp) in zip(completions, flps)]
+        raw_flps = [completion if isinstance(completion, str) else completion[0]['content'] for completion in completions]
+        cleaned_flps = [extract_code_block(rflp) for rflp in raw_flps]
+        flps = [remove_lean_comments(rflp) if flp == '' else remove_lean_comments(flp) for (flp, rflp) in zip(cleaned_flps, raw_flps)]
 
         translations = [
-            {'nlp': nlp, 'flp': flp} if self.exclude_header else
             {'nlp': nlp, 'flp': self.hd + flp}
         for (nlp, flp) in zip(nlps, flps)]
         compiler_check_results = self.compiler_check(translations, flps)
