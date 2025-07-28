@@ -6,6 +6,8 @@ from bitsandbytes.optim import Adam8bit
 import logging
 from datetime import datetime
 import yaml
+import torch
+import os
 
 from eval import Evaluator
 from inference import load_problems
@@ -40,10 +42,11 @@ def grpo_online(config: dict):
 
     current_time = datetime.now().strftime("%m%d%H%M")
     opt_dir = './logs' + '/grpo' + current_time
+    os.makedirs(opt_dir, exist_ok=True)
     grpo_configs = GRPOConfig(
         output_dir=opt_dir,
         **config['grpo_configs'])
-    model = AutoModelForCausalLM.from_pretrained(config['model'])
+    model = AutoModelForCausalLM.from_pretrained(config['model'], torch_dtype=torch.bfloat16)
     tokenizer = AutoTokenizer.from_pretrained(config['model'])
     tokenizer.pad_token = tokenizer.eos_token
     optimizer = Adam8bit(model.parameters(), lr=grpo_configs.learning_rate)
@@ -53,7 +56,6 @@ def grpo_online(config: dict):
         reward_funcs=evaluator,
         args=grpo_configs,
         train_dataset=messages,
-        # peft_config=LoraConfig(**config['lora_configs'])
     )
     trainer.optimizer = optimizer
 
